@@ -1,4 +1,23 @@
 import invoke
+import os
+import shutil
+import time
+from pathlib import Path
+import unittest
+from invoke.tasks import Task
+
+
+def robust_rmtree(path, max_retries=5, delay=0.1):
+    if not Path(path).exists():
+        return
+    for i in range(max_retries):
+        try:
+            shutil.rmtree(path)
+            return
+        except OSError:
+            if i == max_retries - 1:
+                raise
+            time.sleep(delay)
 
 
 @invoke.task(optional=["problem"])
@@ -64,9 +83,9 @@ def submit(_):
 
     # Cleanup previous submissions attempts
     if tmp_dir_path.exists():
-        shutil.rmtree(tmp_dir_path)
+        robust_rmtree(tmp_dir_path)
     if zip_file_path.exists():
-        zip_file_path.unlink()
+        os.remove(zip_file_path)
 
     # Copy tree over to temporary directory
     shutil.copytree(homework_path, tmp_dir_path, ignore=shutil.ignore_patterns("*.pyc", "tmp", "__pycache__", ".mypy_cache"))
@@ -75,5 +94,5 @@ def submit(_):
     shutil.make_archive(zip_file_path, "zip", tmp_dir_path)
 
     # Cleanup
-    shutil.rmtree(tmp_dir_path)
+    robust_rmtree(tmp_dir_path)
 
