@@ -90,4 +90,5 @@ if __name__ == "__main__":
     plt.subplot(2, 3, 6)
     generateLearningCurve(X, y, 8, 100)
     plt.legend()
+    plt.savefig("learning_curves.png", dpi=150, bbox_inches="tight")
     plt.show()

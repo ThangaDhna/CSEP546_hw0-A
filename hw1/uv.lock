@@ -71,7 +71,7 @@ wheels = [
 ]
 
 [[package]]
-name = "cse446"
+name = "csep546"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [
