@@ -24,7 +24,10 @@ def train(x: np.ndarray, y: np.ndarray, _lambda: float) -> np.ndarray:
         np.ndarray: weight matrix of shape `(d, k)`
             which minimizes Regularized Squared Error on `x` and `y` with hyperparameter `_lambda`.
     """
-    raise NotImplementedError("Your Code Goes Here")
+    d = x.shape[1]
+    # Closed-form ridge regression: W = (X'X + lambda*I)^{-1} X'Y
+    reg_matrix = _lambda * np.eye(d)
+    return np.linalg.solve(x.T @ x + reg_matrix, x.T @ y)
 
 
 @problem.tag("hw1-A")
@@ -44,7 +47,8 @@ def predict(x: np.ndarray, w: np.ndarray) -> np.ndarray:
     Returns:
         np.ndarray: predictions matrix of shape `(n,)` or `(n, 1)`.
     """
-    raise NotImplementedError("Your Code Goes Here")
+    # Score each class and return the index of the highest score
+    return np.argmax(x @ w, axis=1)
 
 
 @problem.tag("hw1-A")
@@ -72,7 +76,10 @@ def one_hot(y: np.ndarray, num_classes: int) -> np.ndarray:
         ]
         ```
     """
-    raise NotImplementedError("Your Code Goes Here")
+    n = len(y)
+    result = np.zeros((n, num_classes))
+    result[np.arange(n), y] = 1
+    return result
 
 
 def main():
