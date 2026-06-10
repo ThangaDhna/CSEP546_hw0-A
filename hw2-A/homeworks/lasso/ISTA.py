@@ -23,9 +23,25 @@ def step(
 
     Returns:
         Tuple[np.ndarray, float]: Tuple with 2 entries. First represents updated weight vector, second represents bias.
-    
+
     """
-    raise NotImplementedError("Your Code Goes Here")
+    # Compute residuals using current weight and bias
+    r = X @ weight + bias - y  # shape (n,)
+
+    # Update bias: gradient of SSE w.r.t. b is 2 * sum(r)
+    bias_new = bias - 2 * eta * np.sum(r)
+
+    # Compute gradient for all weights at once: a_k = X[:, k]^T @ r
+    a = X.T @ r  # shape (d,)
+
+    # Gradient step on weights
+    w_step = weight - 2 * eta * a  # shape (d,)
+
+    # Soft thresholding with threshold = 2 * eta * lambda
+    threshold = 2 * eta * _lambda
+    weight_new = np.sign(w_step) * np.maximum(np.abs(w_step) - threshold, 0.0)
+
+    return weight_new, bias_new
 
 
 @problem.tag("hw2-A")
@@ -44,7 +60,8 @@ def loss(
     Returns:
         float: value of the loss function
     """
-    raise NotImplementedError("Your Code Goes Here")
+    r = X @ weight + bias - y
+    return float(np.sum(r ** 2) + _lambda * np.sum(np.abs(weight)))
 
 
 @problem.tag("hw2-A", start_line=5)
@@ -95,7 +112,18 @@ def train(
         start_bias = 0
     old_w: Optional[np.ndarray] = None
     old_b: float = None
-    raise NotImplementedError("Your Code Goes Here")
+
+    weight = np.copy(start_weight)
+    bias = float(start_bias)
+
+    while True:
+        old_w = np.copy(weight)
+        old_b = bias
+        weight, bias = step(X, y, weight, bias, _lambda, eta)
+        if convergence_criterion(weight, old_w, bias, old_b, convergence_delta):
+            break
+
+    return weight, bias
 
 
 @problem.tag("hw2-A")
@@ -116,7 +144,9 @@ def convergence_criterion(
     Returns:
         bool: False, if weight and bias has not converged yet. True otherwise.
     """
-    raise NotImplementedError("Your Code Goes Here")
+    max_w_change = np.max(np.abs(weight - old_w))
+    b_change = np.abs(bias - old_b)
+    return bool(max_w_change < convergence_delta and b_change < convergence_delta)
 
 
 @problem.tag("hw2-A")
@@ -124,7 +154,95 @@ def main():
     """
     Use all of the functions above to make plots.
     """
-    raise NotImplementedError("Your Code Goes Here")
+    np.random.seed(546)
+    n, d, k = 500, 1000, 100
+    sigma = 1.0
+
+    # True weights: w_j = j/k for j in {1,...,k}, 0 otherwise (1-indexed)
+    w_true = np.zeros(d)
+    for j in range(1, k + 1):
+        w_true[j - 1] = j / k
+
+    # Generate and standardize data
+    X = np.random.randn(n, d)
+    X = (X - X.mean(axis=0)) / X.std(axis=0)
+
+    # Generate targets (b=0 in the model)
+    eps = sigma * np.random.randn(n)
+    y = X @ w_true + eps
+
+    # Compute lambda_max: smallest lambda for which solution is all zeros
+    y_mean = np.mean(y)
+    lam_max = float(np.max(np.abs(2 * X.T @ (y - y_mean))))
+
+    # --- Regularization path ---
+    lambdas = []
+    nnzs = []
+    fdrs = []
+    tprs = []
+
+    true_nonzero = w_true != 0  # first k features
+
+    lam = lam_max
+    weight = None
+    bias = None
+
+    while True:
+        lambdas.append(lam)
+
+        if weight is None:
+            weight, bias = train(X, y, _lambda=lam)
+        else:
+            weight, bias = train(X, y, _lambda=lam, start_weight=weight, start_bias=bias)
+
+        nonzero_mask = weight != 0
+        nnz = int(np.sum(nonzero_mask))
+        nnzs.append(nnz)
+
+        # FDR: number of incorrect nonzeros / total nonzeros
+        incorrect_nz = nonzero_mask & ~true_nonzero
+        fdr = float(np.sum(incorrect_nz) / max(nnz, 1))
+
+        # TPR: number of correct nonzeros / k
+        correct_nz = nonzero_mask & true_nonzero
+        tpr = float(np.sum(correct_nz) / k)
+
+        fdrs.append(fdr)
+        tprs.append(tpr)
+
+        # Stop when nearly all features are chosen
+        if nnz >= d - 10:
+            break
+
+        lam /= 2
+
+        if lam < 1e-4:  # safety stop
+            break
+
+    # --- Plot 1: number of non-zeros vs lambda (log x-axis) ---
+    plt.figure(figsize=(8, 5))
+    plt.plot(lambdas, nnzs, 'b-o', markersize=4)
+    plt.xscale('log')
+    plt.xlabel(r'$\lambda$ (log scale)')
+    plt.ylabel(r'Number of non-zeros in $\hat{w}$')
+    plt.title('Lasso Regularization Path: Sparsity vs $\\lambda$')
+    plt.grid(True, which='both', alpha=0.3)
+    plt.tight_layout()
+    plt.savefig('plot1_nonzeros_vs_lambda.png', dpi=150, bbox_inches='tight')
+    plt.show()
+
+    # --- Plot 2: FDR vs TPR ---
+    plt.figure(figsize=(6, 6))
+    plt.plot(fdrs, tprs, 'r-o', markersize=4)
+    plt.xlabel('FDR (False Discovery Rate)')
+    plt.ylabel('TPR (True Positive Rate)')
+    plt.title('FDR vs TPR for Lasso Regularization Path')
+    plt.xlim(-0.02, 1.02)
+    plt.ylim(-0.02, 1.02)
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig('plot2_fdr_vs_tpr.png', dpi=150, bbox_inches='tight')
+    plt.show()
 
 
 if __name__ == "__main__":

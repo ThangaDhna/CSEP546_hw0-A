@@ -43,14 +43,14 @@ class BinaryLogReg:
         # Fill in with matrix with the correct shape
         self.weight: np.ndarray = None  # type: ignore
         self.bias: float = 0.0
-        raise NotImplementedError("Your Code Goes Here")
+        # weight is initialized lazily in train() once d is known
 
     @problem.tag("hw2-A")
     def mu(self, X: np.ndarray, y: np.ndarray) -> np.ndarray:
         """Calculate mu in vectorized form, as described in the problem.
         The equation for i^th element of vector mu is given by:
 
-        $$ \mu_i = 1 / (1 + \exp(-y_i (bias + x_i^T weight))) $$
+        $$ \\mu_i = 1 / (1 + \\exp(-y_i (bias + x_i^T weight))) $$
 
         Args:
             X (np.ndarray): observations represented as `(n, d)` matrix.
@@ -62,7 +62,8 @@ class BinaryLogReg:
         Returns:
             np.ndarray: An `(n, )` vector containing mu_i for i^th element.
         """
-        raise NotImplementedError("Your Code Goes Here")
+        z = y * (X @ self.weight + self.bias)
+        return 1.0 / (1.0 + np.exp(-np.clip(z, -500.0, 500.0)))
 
     @problem.tag("hw2-A")
     def loss(self, X: np.ndarray, y: np.ndarray) -> float:
@@ -78,7 +79,9 @@ class BinaryLogReg:
         Returns:
             float: Loss given X, y, self.weight, self.bias and self._lambda
         """
-        raise NotImplementedError("Your Code Goes Here")
+        z = y * (X @ self.weight + self.bias)
+        nll = np.mean(np.logaddexp(0.0, -z))
+        return float(nll + self._lambda * np.dot(self.weight, self.weight))
 
     @problem.tag("hw2-A")
     def gradient_J_weight(self, X: np.ndarray, y: np.ndarray) -> np.ndarray:
@@ -93,7 +96,9 @@ class BinaryLogReg:
         Returns:
             np.ndarray: An `(d, )` vector which represents gradient of loss J with respect to self.weight.
         """
-        raise NotImplementedError("Your Code Goes Here")
+        n = len(y)
+        mu_vals = self.mu(X, y)
+        return -(1.0 / n) * (X.T @ (y * (1.0 - mu_vals))) + 2.0 * self._lambda * self.weight
 
     @problem.tag("hw2-A")
     def gradient_J_bias(self, X: np.ndarray, y: np.ndarray) -> float:
@@ -109,7 +114,9 @@ class BinaryLogReg:
         Returns:
             float: A number that represents gradient of loss J with respect to self.bias.
         """
-        raise NotImplementedError("Your Code Goes Here")
+        n = len(y)
+        mu_vals = self.mu(X, y)
+        return float(-(1.0 / n) * np.sum(y * (1.0 - mu_vals)))
 
     @problem.tag("hw2-A")
     def predict(self, X: np.ndarray) -> np.ndarray:
@@ -123,7 +130,7 @@ class BinaryLogReg:
         Returns:
             np.ndarray: An `(n, )` array of either -1s or 1s representing guess for each observation.
         """
-        raise NotImplementedError("Your Code Goes Here")
+        return np.sign(X @ self.weight + self.bias)
 
     @problem.tag("hw2-A")
     def misclassification_error(self, X: np.ndarray, y: np.ndarray) -> float:
@@ -140,7 +147,7 @@ class BinaryLogReg:
         Returns:
             float: percentage of times prediction did not match target, given an observation (i.e. misclassification error).
         """
-        raise NotImplementedError("Your Code Goes Here")
+        return float(np.mean(self.predict(X) != y))
 
     @problem.tag("hw2-A")
     def step(self, X: np.ndarray, y: np.ndarray, learning_rate: float = 1e-4):
@@ -156,7 +163,8 @@ class BinaryLogReg:
             learning_rate (float, optional): Learning rate of SGD/GD algorithm.
                 Defaults to 1e-4.
         """
-        raise NotImplementedError("Your Code Goes Here")
+        self.weight -= learning_rate * self.gradient_J_weight(X, y)
+        self.bias   -= learning_rate * self.gradient_J_bias(X, y)
 
     @problem.tag("hw2-A", start_line=7)
     def train(
@@ -214,26 +222,94 @@ class BinaryLogReg:
             "test_losses": [],
             "test_errors": [],
         }
-        raise NotImplementedError("Your Code Goes Here")
+        if self.weight is None:
+            self.weight = np.zeros(X_train.shape[1])
+
+        for _epoch in range(epochs):
+            # Shuffle training data for this epoch
+            idx = RNG.permutation(len(X_train))
+            X_shuf, y_shuf = X_train[idx], y_train[idx]
+
+            for b in range(num_batches):
+                start = b * batch_size
+                end = min(start + batch_size, len(X_train))
+                self.step(X_shuf[start:end], y_shuf[start:end], learning_rate)
+
+            result["train_losses"].append(self.loss(X_train, y_train))
+            result["train_errors"].append(self.misclassification_error(X_train, y_train))
+            result["test_losses"].append(self.loss(X_test, y_test))
+            result["test_errors"].append(self.misclassification_error(X_test, y_test))
+
+        return result
+
+
+def _save_plots(history: Dict, prefix: str, title_suffix: str) -> None:
+    epochs = range(1, len(history["train_losses"]) + 1)
+
+    # Loss plot
+    plt.figure(figsize=(8, 5))
+    plt.plot(epochs, history["train_losses"], label="Train")
+    plt.plot(epochs, history["test_losses"],  label="Test")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss $J(w, b)$")
+    plt.title(f"Loss vs Epoch — {title_suffix}")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(f"{prefix}_loss.png", dpi=150, bbox_inches="tight")
+    plt.clf()
+    plt.close()
+
+    # Misclassification error plot
+    plt.figure(figsize=(8, 5))
+    plt.plot(epochs, history["train_errors"], label="Train")
+    plt.plot(epochs, history["test_errors"],  label="Test")
+    plt.xlabel("Epoch")
+    plt.ylabel("Misclassification Error")
+    plt.title(f"Misclassification Error vs Epoch — {title_suffix}")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(f"{prefix}_error.png", dpi=150, bbox_inches="tight")
+    plt.clf()
+    plt.close()
 
 
 if __name__ == "__main__":
-    model = BinaryLogReg()
     (x_train, y_train), (x_test, y_test) = load_2_7_mnist()
-    history = model.train(x_train, y_train, x_test, y_test)
+    # Data is already normalized to [0, 1] by load_dataset
 
-    # Plot losses
-    plt.plot(history["train_losses"], label="Train")
-    plt.plot(history["test_losses"], label="Test")
-    plt.xlabel("Epochs")
-    plt.ylabel("Loss")
-    plt.legend()
-    plt.show()
+    _lambda = 0.1
+    epochs  = 30
 
-    # Plot error
-    plt.plot(history["train_errors"], label="Train")
-    plt.plot(history["test_errors"], label="Test")
-    plt.xlabel("Epochs")
-    plt.ylabel("Misclassification Error")
-    plt.legend()
-    plt.show()
+    # --- Part b: Full-batch Gradient Descent ---
+    print("Part b: Full-batch GD (η=0.1)...")
+    model_b = BinaryLogReg(_lambda=_lambda)
+    hist_b = model_b.train(x_train, y_train, x_test, y_test,
+                           learning_rate=0.1, epochs=epochs,
+                           batch_size=len(x_train))
+    _save_plots(hist_b, "a7_plot_b", "GD — Full Batch (η=0.1)")
+    print(f"  Final train loss={hist_b['train_losses'][-1]:.4f}  "
+          f"test error={hist_b['test_errors'][-1]:.4f}")
+
+    # --- Part c: SGD, batch_size = 1 ---
+    print("Part c: SGD (batch_size=1, η=0.001)...")
+    model_c = BinaryLogReg(_lambda=_lambda)
+    hist_c = model_c.train(x_train, y_train, x_test, y_test,
+                           learning_rate=0.001, epochs=epochs,
+                           batch_size=1)
+    _save_plots(hist_c, "a7_plot_c", "SGD — Batch Size 1 (η=0.001)")
+    print(f"  Final train loss={hist_c['train_losses'][-1]:.4f}  "
+          f"test error={hist_c['test_errors'][-1]:.4f}")
+
+    # --- Part d: SGD, batch_size = 100 ---
+    print("Part d: SGD (batch_size=100, η=0.05)...")
+    model_d = BinaryLogReg(_lambda=_lambda)
+    hist_d = model_d.train(x_train, y_train, x_test, y_test,
+                           learning_rate=0.05, epochs=epochs,
+                           batch_size=100)
+    _save_plots(hist_d, "a7_plot_d", "SGD — Batch Size 100 (η=0.05)")
+    print(f"  Final train loss={hist_d['train_losses'][-1]:.4f}  "
+          f"test error={hist_d['test_errors'][-1]:.4f}")
+
+    print("Done. 6 plots saved.")

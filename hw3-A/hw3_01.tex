@@ -1,0 +1,33 @@
+\documentclass{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{parskip}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{booktabs}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\argmax}{arg\,max}
+
+\title{CSE P 546 A - Homework 3}
+\author{Thangakumar Dhanasekaran (2550520)}
+\date{May-22-2026}
+
+\begin{document}
+
+\maketitle
+
+\section*{A1}
+
+\begin{enumerate}
+  \item[(a)] \textbf{False.} Deep neural network loss functions are generally non-convex due to the composition of non-linear activations, so gradient descent can converge to a local minimum rather than the global optimum.
+
+  \item[(b)] \textbf{False.} Initializing all weights to zero causes the symmetry problem: every neuron in a layer computes identical outputs and gradients, so they all update identically and the network never learns differentiated features. Random initialization breaks this symmetry.
+
+  \item[(c)] \textbf{True.} Without non-linear activations, any composition of linear layers reduces to a single linear transformation, which can only learn linear decision boundaries. Non-linear activations are what allow the network to represent non-linear functions.
+
+  \item[(d)] \textbf{False.} The backward pass traverses the same computation graph as the forward pass, so its time complexity is comparable (roughly $2\times$--$3\times$ the forward pass cost). It is not prohibitively larger.
+
+  \item[(e)] \textbf{False.} Neural networks have high capacity but require large amounts of data and compute, and can be difficult to interpret. Simpler models (e.g., linear models, decision trees) are often preferable in low-data, resource-constrained, or interpretability-critical settings.
+\end{enumerate}
+
+\end{document}
